@@ -1,0 +1,6 @@
+{
+  "name": "nano-banana-2",
+  "version": "1.0.0",
+  "description": "Image generation with Google Gemini Nano Banana 2 via MCP",
+  "skills": ["skills/generate-image"]
+}

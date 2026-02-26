@@ -1,0 +1,47 @@
+{
+  "name": "nano-banana-2-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Google's Gemini image generation with Nano Banana 2 support, resolution control, thinking modes, and context-window-safe output",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "nano-banana-2-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist/",
+    ".claude-plugin/",
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@google/genai": "^1.16.0",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daveremy/nano-banana-2-mcp"
+  },
+  "keywords": [
+    "mcp",
+    "gemini",
+    "image-generation",
+    "nano-banana",
+    "claude-code"
+  ],
+  "license": "MIT",
+  "author": "daveremy"
+}

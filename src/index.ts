@@ -23,9 +23,8 @@ const DEFAULT_MODEL = "gemini-3.1-flash-image-preview";
 const IMAGE_MODEL_PATTERN = /-image(-preview)?$/;
 const GEMINI_3X_PATTERN = /gemini-3\./;
 
-const VALID_RESOLUTIONS = new Set(["0.5K", "1K", "2K", "4K"]);
+const VALID_RESOLUTIONS = new Set(["1K", "2K", "4K"]);
 const VALID_THINKING = new Set(["minimal", "high"]);
-const VALID_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
 const ALLOWED_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 const MAX_IMAGE_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_NUMBER_OF_IMAGES = 4;
@@ -115,7 +114,7 @@ const imageParamProperties = {
   },
   resolution: {
     type: "string" as const,
-    description: "Image resolution: \"0.5K\", \"1K\", \"2K\", or \"4K\".",
+    description: "Image resolution: \"1K\", \"2K\", or \"4K\".",
     default: "1K",
   },
   thinking: {
@@ -127,11 +126,6 @@ const imageParamProperties = {
     type: "number" as const,
     description: "Number of images to generate (1–4). Multiple images saved with sequential suffixes.",
     default: 1,
-  },
-  outputMimeType: {
-    type: "string" as const,
-    description: "Output format: \"image/png\" or \"image/jpeg\".",
-    default: "image/png",
   },
   returnInlineImage: {
     type: "boolean" as const,
@@ -293,7 +287,6 @@ class NanoBanana2MCP {
     const resolution = (args.resolution as string) || "1K";
     const thinking = (args.thinking as string) || "minimal";
     const numberOfImages = Math.min(Math.max(Math.round(Number(args.numberOfImages) || 1), 1), MAX_NUMBER_OF_IMAGES);
-    const outputMimeType = (args.outputMimeType as string) || "image/png";
     const returnInlineImage = resolveInlineImage(
       args.returnInlineImage === undefined ? undefined : Boolean(args.returnInlineImage),
     );
@@ -305,11 +298,8 @@ class NanoBanana2MCP {
     if (!VALID_THINKING.has(thinking)) {
       throw new McpError(ErrorCode.InvalidParams, `Invalid thinking "${thinking}". Use: ${[...VALID_THINKING].join(", ")}`);
     }
-    if (!VALID_MIME_TYPES.has(outputMimeType)) {
-      throw new McpError(ErrorCode.InvalidParams, `Invalid outputMimeType "${outputMimeType}". Use: ${[...VALID_MIME_TYPES].join(", ")}`);
-    }
 
-    return { aspectRatio, resolution, thinking, numberOfImages, outputMimeType, returnInlineImage };
+    return { aspectRatio, resolution, thinking, numberOfImages, returnInlineImage };
   }
 
   // -------------------------------------------------------------------------
@@ -331,8 +321,6 @@ class NanoBanana2MCP {
         imageConfig: {
           aspectRatio: params.aspectRatio,
           imageSize: params.resolution,
-          numberOfImages: params.numberOfImages,
-          outputMimeType: params.outputMimeType,
         },
       }),
       ...(thinkingSupported && {
@@ -422,15 +410,22 @@ class NanoBanana2MCP {
     if (!prompt) throw new McpError(ErrorCode.InvalidParams, "prompt is required");
 
     const params = this.extractImageParams(args);
-    const response = await this.callGemini(prompt, params);
 
-    const savedImages = await this.processResponse(response, "generated", params);
-    if (savedImages.length === 0) {
+    // Make multiple API calls for numberOfImages > 1 (API doesn't support batch)
+    const allSaved: Array<{ filePath: string; fileSize: number; base64: string; mimeType: string }> = [];
+    for (let i = 0; i < params.numberOfImages; i++) {
+      const response = await this.callGemini(prompt, params);
+      const suffix = params.numberOfImages > 1 ? `-${i + 1}` : "";
+      const saved = await this.processResponseSingle(response, "generated", suffix);
+      allSaved.push(...saved);
+    }
+
+    if (allSaved.length === 0) {
       return { content: [{ type: "text", text: "No image was generated. Try rephrasing your prompt." }] };
     }
 
-    this.lastImagePath = savedImages[0].filePath;
-    return this.buildResponse(savedImages, params.returnInlineImage);
+    this.lastImagePath = allSaved[0].filePath;
+    return this.buildResponse(allSaved, params.returnInlineImage);
   }
 
   // -------------------------------------------------------------------------
@@ -473,13 +468,13 @@ class NanoBanana2MCP {
     const params = this.extractImageParams(args);
     const response = await this.callGemini([{ parts }], params);
 
-    const savedImages = await this.processResponse(response, "edited", params);
-    if (savedImages.length === 0) {
+    const saved = await this.processResponseSingle(response, "edited", "");
+    if (saved.length === 0) {
       return { content: [{ type: "text", text: "No edited image was produced. Try a different prompt." }] };
     }
 
-    this.lastImagePath = savedImages[0].filePath;
-    return this.buildResponse(savedImages, params.returnInlineImage);
+    this.lastImagePath = saved[0].filePath;
+    return this.buildResponse(saved, params.returnInlineImage);
   }
 
   // -------------------------------------------------------------------------
@@ -558,22 +553,19 @@ class NanoBanana2MCP {
   // Process Gemini response → saved images
   // -------------------------------------------------------------------------
 
-  private async processResponse(
+  private async processResponseSingle(
     response: Awaited<ReturnType<GoogleGenAI["models"]["generateContent"]>>,
     prefix: string,
-    params: ReturnType<typeof this.extractImageParams>,
+    suffix: string,
   ): Promise<Array<{ filePath: string; fileSize: number; base64: string; mimeType: string }>> {
     const candidates = response.candidates || [];
     const saved: Array<{ filePath: string; fileSize: number; base64: string; mimeType: string }> = [];
-    let imageIndex = 0;
 
     for (const candidate of candidates) {
       const parts = candidate.content?.parts || [];
       for (const part of parts) {
         if (part.inlineData?.data) {
-          imageIndex++;
-          const suffix = params.numberOfImages > 1 ? `-${imageIndex}` : "";
-          const mimeType = part.inlineData.mimeType || params.outputMimeType;
+          const mimeType = part.inlineData.mimeType || "image/png";
           const { filePath, fileSize } = await this.saveImage(
             part.inlineData.data,
             mimeType,

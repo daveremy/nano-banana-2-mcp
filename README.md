@@ -5,11 +5,10 @@ MCP server for Google Gemini image generation, upgraded for **Nano Banana 2** (`
 A fork/rewrite of [ConechoAI/Nano-Banana-MCP](https://github.com/ConechoAI/Nano-Banana-MCP) with:
 
 - **Nano Banana 2 model** — better text rendering, thinking modes, resolution control
-- **Resolution control** — 0.5K, 1K, 2K, 4K
+- **Resolution control** — 1K, 2K, 4K
 - **Aspect ratio** — any ratio the API supports (1:1, 16:9, 9:16, 4:3, etc.)
 - **Thinking modes** — minimal or high
 - **Multiple images** — generate 1–4 variations per call
-- **Output format** — PNG or JPEG
 - **File-path-only mode** — no inline base64, fixes context window overflow in Claude Code
 - **Security hardening** — path validation, file size caps, no plaintext API key storage
 
@@ -19,9 +18,40 @@ A fork/rewrite of [ConechoAI/Nano-Banana-MCP](https://github.com/ConechoAI/Nano-
 
 Get one from [Google AI Studio](https://aistudio.google.com/apikey).
 
-### 2. Add to Claude Code
+### 2. Install
 
-Add to `~/.claude.json`:
+**Via Claude Code plugin (recommended):**
+
+```bash
+claude plugin add nano-banana-2-mcp
+```
+
+**Or manually via npx** — add to your Claude Code MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "nano-banana-2": {
+      "command": "npx",
+      "args": ["-y", "nano-banana-2-mcp"],
+      "env": {
+        "GEMINI_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+**Or from source** for development:
+
+```bash
+git clone https://github.com/daveremy/nano-banana-2-mcp.git
+cd nano-banana-2-mcp
+npm install
+npm run build
+```
+
+Then point your MCP config at `dist/index.js`:
 
 ```json
 {
@@ -37,15 +67,7 @@ Add to `~/.claude.json`:
 }
 ```
 
-### 3. Build
-
-```bash
-cd nano-banana-2-mcp
-npm install
-npm run build
-```
-
-### 4. Restart Claude Code
+### 3. Restart Claude Code
 
 The tools will be available after restart.
 
@@ -59,10 +81,9 @@ Generate a new image from a text prompt.
 |-----------|------|---------|-------------|
 | `prompt` | string | (required) | Text prompt for the image |
 | `aspectRatio` | string | `"1:1"` | Aspect ratio (e.g. "16:9", "9:16") |
-| `resolution` | string | `"1K"` | `0.5K`, `1K`, `2K`, `4K` |
+| `resolution` | string | `"1K"` | `1K`, `2K`, or `4K` |
 | `thinking` | string | `"minimal"` | `minimal` or `high` |
 | `numberOfImages` | number | `1` | 1–4 |
-| `outputMimeType` | string | `"image/png"` | `image/png` or `image/jpeg` |
 | `returnInlineImage` | boolean | `true` | If false, return only file path |
 
 ### `edit_image`
@@ -101,7 +122,7 @@ Get path and size of the last generated image.
 
 The server auto-detects model capabilities:
 
-- **Image models** (`*-image`, `*-image-preview`): get `imageConfig` (resolution, aspect ratio, numberOfImages, outputMimeType)
+- **Image models** (`*-image`, `*-image-preview`): get `imageConfig` (resolution, aspect ratio)
 - **Gemini 3.x image models**: also get `thinkingConfig`
 - **Other models**: basic config only
 
@@ -109,7 +130,11 @@ This means you can use `NANO_BANANA_MODEL=gemini-2.5-flash-image` and it will se
 
 ## Claude Code Plugin
 
-This repo includes a Claude Code plugin with a `generate-image` skill that provides best-practice prompting guidance. To use it, add the repo path to your Claude Code plugins config.
+This repo includes a Claude Code plugin with a `generate-image` skill that provides best-practice prompting guidance. Install via `claude plugin add nano-banana-2-mcp` or add the repo path to your Claude Code plugins config.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and release process.
 
 ## Attribution
 

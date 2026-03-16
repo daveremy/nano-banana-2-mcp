@@ -14,6 +14,7 @@ import {
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs/promises";
 import path from "path";
+import { VERSION } from "./version.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -28,6 +29,21 @@ const VALID_THINKING = new Set(["minimal", "high"]);
 const ALLOWED_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 const MAX_IMAGE_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_NUMBER_OF_IMAGES = 4;
+
+interface SavedImage {
+  filePath: string;
+  fileSize: number;
+  base64: string;
+  mimeType: string;
+}
+
+interface ImageParams {
+  aspectRatio: string;
+  resolution: string;
+  thinking: string;
+  numberOfImages: number;
+  returnInlineImage: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,6 +70,12 @@ function resolveInlineImage(perCall: boolean | undefined): boolean {
   const env = process.env.NANO_BANANA_INLINE_IMAGE;
   if (env !== undefined) return env === "true";
   return true; // default
+}
+
+function extensionToMime(ext: string): string {
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".png") return "image/png";
+  return "image/jpeg";
 }
 
 function mimeToExtension(mime: string): string {
@@ -144,7 +166,7 @@ class NanoBanana2MCP {
 
   constructor() {
     this.server = new Server(
-      { name: "nano-banana-2-mcp", version: "1.0.0" },
+      { name: "nano-banana-2", version: VERSION },
       { capabilities: { tools: {} } },
     );
     this.setupHandlers();
@@ -282,16 +304,16 @@ class NanoBanana2MCP {
   // Parameter extraction
   // -------------------------------------------------------------------------
 
-  private extractImageParams(args: Record<string, unknown>) {
+  private extractImageParams(args: Record<string, unknown>): ImageParams {
     const aspectRatio = (args.aspectRatio as string) || "1:1";
     const resolution = (args.resolution as string) || "1K";
     const thinking = (args.thinking as string) || "minimal";
-    const numberOfImages = Math.min(Math.max(Math.round(Number(args.numberOfImages) || 1), 1), MAX_NUMBER_OF_IMAGES);
+    const raw = Math.round(Number(args.numberOfImages) || 1);
+    const numberOfImages = Math.min(Math.max(raw, 1), MAX_NUMBER_OF_IMAGES);
     const returnInlineImage = resolveInlineImage(
       args.returnInlineImage === undefined ? undefined : Boolean(args.returnInlineImage),
     );
 
-    // Validate
     if (!VALID_RESOLUTIONS.has(resolution)) {
       throw new McpError(ErrorCode.InvalidParams, `Invalid resolution "${resolution}". Use: ${[...VALID_RESOLUTIONS].join(", ")}`);
     }
@@ -308,7 +330,7 @@ class NanoBanana2MCP {
 
   private async callGemini(
     contents: string | Array<{ parts: Array<Record<string, unknown>> }>,
-    params: ReturnType<typeof this.extractImageParams>,
+    params: ImageParams,
   ) {
     const genAI = this.initGenAI();
     const modelId = getModelId();
@@ -330,13 +352,11 @@ class NanoBanana2MCP {
       }),
     };
 
-    const response = await genAI.models.generateContent({
+    return genAI.models.generateContent({
       model: modelId,
       contents,
       config,
     });
-
-    return response;
   }
 
   // -------------------------------------------------------------------------
@@ -369,21 +389,15 @@ class NanoBanana2MCP {
   // -------------------------------------------------------------------------
 
   private buildResponse(
-    savedImages: Array<{ filePath: string; fileSize: number; base64: string; mimeType: string }>,
+    savedImages: SavedImage[],
     returnInlineImage: boolean,
   ): CallToolResult {
     const content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> = [];
 
     // Text summary
-    const lines: string[] = [];
-    for (const img of savedImages) {
-      lines.push(`${img.filePath} (${formatBytes(img.fileSize)})`);
-    }
-    if (savedImages.length === 1) {
-      lines.push("Use continue_editing to refine this image.");
-    } else {
-      lines.push("Use continue_editing to refine the first image.");
-    }
+    const lines = savedImages.map((img) => `${img.filePath} (${formatBytes(img.fileSize)})`);
+    const target = savedImages.length === 1 ? "this image" : "the first image";
+    lines.push(`Use continue_editing to refine ${target}.`);
     content.push({ type: "text", text: lines.join("\n") });
 
     // Inline images (if enabled)
@@ -412,7 +426,7 @@ class NanoBanana2MCP {
     const params = this.extractImageParams(args);
 
     // Make multiple API calls for numberOfImages > 1 (API doesn't support batch)
-    const allSaved: Array<{ filePath: string; fileSize: number; base64: string; mimeType: string }> = [];
+    const allSaved: SavedImage[] = [];
     for (let i = 0; i < params.numberOfImages; i++) {
       const response = await this.callGemini(prompt, params);
       const suffix = params.numberOfImages > 1 ? `-${i + 1}` : "";
@@ -451,11 +465,7 @@ class NanoBanana2MCP {
     const parts: Array<Record<string, unknown>> = [];
     for (const p of allPaths) {
       const data = await fs.readFile(p);
-      const ext = path.extname(p).toLowerCase();
-      const mime =
-        ext === ".png" ? "image/png" :
-        ext === ".webp" ? "image/webp" :
-        "image/jpeg";
+      const mime = extensionToMime(path.extname(p).toLowerCase());
       parts.push({
         inlineData: {
           data: data.toString("base64"),
@@ -557,9 +567,9 @@ class NanoBanana2MCP {
     response: Awaited<ReturnType<GoogleGenAI["models"]["generateContent"]>>,
     prefix: string,
     suffix: string,
-  ): Promise<Array<{ filePath: string; fileSize: number; base64: string; mimeType: string }>> {
+  ): Promise<SavedImage[]> {
     const candidates = response.candidates || [];
-    const saved: Array<{ filePath: string; fileSize: number; base64: string; mimeType: string }> = [];
+    const saved: SavedImage[] = [];
 
     for (const candidate of candidates) {
       const parts = candidate.content?.parts || [];

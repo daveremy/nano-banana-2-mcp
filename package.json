@@ -16,8 +16,11 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepack": "npm run build",
     "start": "node dist/index.js",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "release": "./scripts/release.sh"
   },
   "engines": {
     "node": ">=18.0.0"

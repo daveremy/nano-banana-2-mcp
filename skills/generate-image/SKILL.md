@@ -1,11 +1,21 @@
 ---
 name: generate-image
 description: Generate images using nano-banana-2 MCP tools with best-practice prompting. Use this skill when the user asks to create, generate, or edit images.
+allowed-tools: mcp__nano-banana-2__generate_image, mcp__nano-banana-2__edit_image, mcp__nano-banana-2__continue_editing, mcp__nano-banana-2__get_configuration_status, mcp__nano-banana-2__get_last_image_info
 ---
 
 # Image Generation with Nano Banana 2
 
-Use the `generate_image`, `edit_image`, and `continue_editing` MCP tools from the `nano-banana-2-mcp` server.
+Use the `generate_image`, `edit_image`, and `continue_editing` MCP tools from the `nano-banana-2` server.
+
+## First-Time Setup
+
+Before generating images, verify the API key is configured:
+
+1. Call `get_configuration_status` to check if `GEMINI_API_KEY` is set.
+2. If the key is missing, instruct the user to add it to their MCP server environment configuration:
+   - In Claude Code settings or `.claude/settings.json`, add `GEMINI_API_KEY` to the server's `env` block.
+   - The key can be obtained from [Google AI Studio](https://aistudio.google.com/apikey).
 
 ## Prompting Best Practices
 

@@ -83,5 +83,27 @@ npm publish
 
 git push origin main --tags
 
+# Update aggregate marketplace (daveremy/claude-plugins)
+AGGREGATE_DIR="${CLAUDE_PLUGINS_DIR:-$HOME/code/claude-plugins}"
+if [ -d "$AGGREGATE_DIR/.claude-plugin" ]; then
+  echo "Updating aggregate marketplace at $AGGREGATE_DIR..."
+  node -e "
+    const fs = require('fs');
+    const p = '$AGGREGATE_DIR/.claude-plugin/marketplace.json';
+    const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const plugin = j.plugins.find(p => p.name === 'nano-banana-2');
+    if (plugin) {
+      plugin.version = '$NEW_VERSION';
+      fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+      console.log('Updated nano-banana-2 to $NEW_VERSION in aggregate marketplace');
+    } else {
+      console.log('WARNING: nano-banana-2 not found in aggregate marketplace');
+    }
+  "
+  (cd "$AGGREGATE_DIR" && git add -A && git commit -m "bump nano-banana-2 to v$NEW_VERSION" && git push origin main)
+else
+  echo "Aggregate marketplace not found at $AGGREGATE_DIR — skipping"
+fi
+
 echo ""
 echo "Released v$NEW_VERSION"

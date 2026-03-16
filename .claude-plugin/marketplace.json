@@ -5,6 +5,6 @@
     "name": "nano-banana-2",
     "source": { "source": "npm", "package": "nano-banana-2-mcp" },
     "description": "Image generation with Google Gemini Nano Banana 2 via MCP",
-    "version": "0.1.0"
+    "version": "0.1.1"
   }]
 }

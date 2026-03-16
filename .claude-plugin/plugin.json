@@ -1,15 +1,14 @@
 {
   "name": "nano-banana-2",
   "description": "Image generation with Google Gemini Nano Banana 2 via MCP",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": { "name": "daveremy" },
   "homepage": "https://github.com/daveremy/nano-banana-2-mcp",
   "repository": "https://github.com/daveremy/nano-banana-2-mcp",
-  "skills": ["skills/generate-image"],
   "mcpServers": {
     "nano-banana-2": {
       "command": "npx",
-      "args": ["-y", "nano-banana-2-mcp@0.1.0"]
+      "args": ["-y", "nano-banana-2-mcp@0.1.1"]
     }
   }
 }

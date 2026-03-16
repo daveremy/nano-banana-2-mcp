@@ -1,6 +1,6 @@
 {
   "name": "nano-banana-2-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Google's Gemini image generation with Nano Banana 2 support, resolution control, thinking modes, and context-window-safe output",
   "main": "dist/index.js",
   "type": "module",
